@@ -204,7 +204,7 @@ const defaultBindings: Record<string, string> = {
   newTab: isMac ? "⌘T" : "Ctrl+T",
   closeTab: isMac ? "⌘W" : "Ctrl+W",
   newWorktree: isMac ? "⌘N" : "Ctrl+N",
-  advancedWorktree: isMac ? "⌘⇧N" : "Ctrl+Shift+N",
+  quickWorktree: isMac ? "⌘⇧N" : "Ctrl+Shift+N",
   closeWorktree: isMac ? "⌘⇧W" : "Ctrl+Shift+W",
   openWorktree: isMac ? "⌘⇧O" : "Ctrl+Shift+O",
   openPR: isMac ? "⌘⇧R" : "Ctrl+Shift+R",
@@ -1100,11 +1100,12 @@ const AgentManagerContent: Component = () => {
         } else setSidePanel((prev) => (prev === "diff" ? null : "diff"))
       } else if (msg.action === "newTab") handleNewTabForCurrentSelection()
       else if (msg.action === "closeTab") closeActiveTab()
-      else if (msg.action === "newWorktree") handleNewWorktreeOrPromote()
+      else if (msg.action === "newWorktree") showNewWorktreeDialog()
+      else if (msg.action === "quickWorktree") handleCreateWorktree()
       else if (msg.action === "openWorktree") openWorktreeDirectory()
       else if (msg.action === "openPR") openSelectedPR()
       else if (msg.action === "runScript") runSelected()
-      else if (msg.action === "advancedWorktree") showAdvancedWorktreeDialog()
+      else if (msg.action === "advancedWorktree") showNewWorktreeDialog()
       else if (msg.action === "closeWorktree") closeSelectedWorktree()
       else if (msg.action === "showShortcuts") handleShowKeyboardShortcuts()
       else if (msg.action === "focusInput") window.dispatchEvent(new Event("focusPrompt"))
@@ -1844,8 +1845,7 @@ const AgentManagerContent: Component = () => {
   }
   const createWorktree = metrics.click("new_worktree", "worktrees", handleCreateWorktree)
 
-  // Advanced worktree dialog — opens a full dialog with prompt, versions, model, mode
-  const showAdvancedWorktreeDialog = () => {
+  const showNewWorktreeDialog = () => {
     if (!loaded()) return
     expandSidebar()
     dialog.show(() => <NewWorktreeDialog onClose={() => dialog.close()} defaultBaseBranch={repoDefaultBranch()} />)
@@ -2174,18 +2174,6 @@ const AgentManagerContent: Component = () => {
     }
   }
 
-  // Cmd+N: if an unassigned session is selected, promote it; otherwise create a new worktree
-  const handleNewWorktreeOrPromote = () => {
-    if (!loaded()) return
-    const sel = selection()
-    const sid = session.currentSessionID()
-    if (sel === null && sid && !worktreeSessionIds().has(sid)) {
-      vscode.postMessage({ type: "agentManager.promoteSession", sessionId: sid })
-      return
-    }
-    handleCreateWorktree()
-  }
-
   // Close the currently selected worktree with a confirmation dialog
   const closeSelectedWorktree = () => {
     const sel = selection()
@@ -2312,7 +2300,7 @@ const AgentManagerContent: Component = () => {
               onRef={(value) => (sidebarSearchMenu = value)}
               onSelect={focusSidebarSearchItem}
               onCreate={createWorktree}
-              onAdvanced={showAdvancedWorktreeDialog}
+              onNew={showNewWorktreeDialog}
               onSection={newSection}
               onShortcuts={metrics.click("keyboard_shortcuts", "worktrees_header", handleShowKeyboardShortcuts)}
               onSetup={setupScript}
@@ -2549,7 +2537,7 @@ const AgentManagerContent: Component = () => {
                   )
                 })()}
                 <Show when={worktrees().length === 0}>
-                  <button class="am-worktree-create" onClick={createWorktree}>
+                  <button class="am-worktree-create" onClick={showNewWorktreeDialog}>
                     <Icon name="plus" size="small" />
                     <span>{t("agentManager.worktree.new")}</span>
                   </button>
@@ -2616,11 +2604,7 @@ const AgentManagerContent: Component = () => {
                           <span class="am-item-title">{s.title || t("agentManager.session.untitled")}</span>
                           <span class="am-item-time">{formatRelativeDate(s.updatedAt)}</span>
                           <div class="am-item-promote">
-                            <TooltipKeybind
-                              title={t("agentManager.session.openInWorktree")}
-                              keybind={kb().newWorktree ?? ""}
-                              placement="right"
-                            >
+                            <Tooltip value={t("agentManager.session.openInWorktree")} placement="right">
                               <IconButton
                                 icon="branch"
                                 size="small"
@@ -2628,7 +2612,7 @@ const AgentManagerContent: Component = () => {
                                 label={t("agentManager.session.openInWorktree")}
                                 onClick={(e: MouseEvent) => handlePromote(s.id, e)}
                               />
-                            </TooltipKeybind>
+                            </Tooltip>
                           </div>
                         </button>
                       </ContextMenu.Trigger>
